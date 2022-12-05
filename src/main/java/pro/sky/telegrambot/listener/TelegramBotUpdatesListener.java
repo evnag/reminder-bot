@@ -7,19 +7,29 @@ import com.pengrad.telegrambot.request.SendMessage;
 import com.pengrad.telegrambot.response.SendResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import pro.sky.telegrambot.domain.NotificationTask;
+import pro.sky.telegrambot.repository.NotificationTaskRepository;
 
 import javax.annotation.PostConstruct;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class TelegramBotUpdatesListener implements UpdatesListener {
 
     private final Logger logger = LoggerFactory.getLogger(TelegramBotUpdatesListener.class);
 
-    @Autowired
-    private TelegramBot telegramBot;
+    private final TelegramBot telegramBot;
+    private final NotificationTaskRepository notificationTaskRepository;
+
+    public TelegramBotUpdatesListener(TelegramBot telegramBot, NotificationTaskRepository notificationTaskRepository) {
+        this.telegramBot = telegramBot;
+        this.notificationTaskRepository = notificationTaskRepository;
+    }
 
     @PostConstruct
     public void init() {
@@ -38,6 +48,21 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
                 logger.info("Message received: {}", messageText);
                 sendMessage(chatId, welcomeMessage);
                 logger.info("Message sent: {}", welcomeMessage);
+            } else {
+                Pattern pattern = Pattern.compile("([0-9\\.\\:\\s]{16})(\\s)([\\W+]+)");
+                Matcher matcher = pattern.matcher(messageText);
+                if (matcher.matches()) {
+                    String date = matcher.group(1);
+                    messageText = messageText.replace(date, "").trim();
+
+                    LocalDateTime localDateTime = LocalDateTime.parse(date, DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+                    createTask(chatId, messageText, localDateTime);
+                    logger.info("Invoke method for creating task");
+                } else {
+                    messageText = "Wrong message format";
+                    sendMessage(chatId, messageText);
+                    logger.info("Message sent: {}", welcomeMessage);
+                }
             }
         });
         return UpdatesListener.CONFIRMED_UPDATES_ALL;
@@ -49,5 +74,7 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
         response.isOk();
     }
 
-
+    private void createTask(Long chatId, String message, LocalDateTime dateTime) {
+        notificationTaskRepository.save(new NotificationTask(chatId, message, dateTime));
+    }
 }
