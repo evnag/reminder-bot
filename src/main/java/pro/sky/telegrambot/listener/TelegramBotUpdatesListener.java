@@ -51,7 +51,7 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
                 sendMessage(chatId, welcomeMessage);
                 logger.info("Message sent: {}", welcomeMessage);
             } else {
-                Pattern pattern = Pattern.compile("([0-9\\.\\:\\s]{16})(\\s)([\\W+]+)");
+                Pattern pattern = Pattern.compile("([0-9\\.\\:\\s]{16})(\\s)([\\P{M}\\p{M}*+]+)");
                 Matcher matcher = pattern.matcher(messageText);
                 if (matcher.matches()) {
                     String date = matcher.group(1);
