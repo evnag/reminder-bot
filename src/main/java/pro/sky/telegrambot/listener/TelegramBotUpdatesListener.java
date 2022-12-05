@@ -36,7 +36,6 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
 
             if (messageText.startsWith("/start")) {
                 logger.info("Message received: {}", messageText);
-
                 sendMessage(chatId, welcomeMessage);
                 logger.info("Message sent: {}", welcomeMessage);
             }
