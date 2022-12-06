@@ -6,14 +6,12 @@ import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.request.SendMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import pro.sky.telegrambot.domain.NotificationTask;
 import pro.sky.telegrambot.repository.NotificationTaskRepository;
 
 import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.regex.Matcher;
 
@@ -73,17 +71,6 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
             }
         });
         return UpdatesListener.CONFIRMED_UPDATES_ALL;
-    }
-
-    @Scheduled(cron = "0 0/1 * * * *")
-    private void checkSchedule() {
-        List<NotificationTask> scheduleTasks = notificationTaskRepository.getNotificationTaskByDateTime(LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES));
-        scheduleTasks.forEach(notificationTask -> {
-            sendMessage(notificationTask.getChatId(), notificationTask.getMessageText());
-            notificationTaskRepository.delete(notificationTask);
-            logger.info("Message sent: {} ", notificationTask);
-            logger.info("Invoke method for deleting task");
-        });
     }
 
     private void sendMessage(Long chatId, String message) {
