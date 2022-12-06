@@ -4,7 +4,6 @@ import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.request.SendMessage;
-import com.pengrad.telegrambot.response.SendResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -14,11 +13,12 @@ import pro.sky.telegrambot.repository.NotificationTaskRepository;
 
 import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import static pro.sky.telegrambot.message.MessageConstants.*;
+import static pro.sky.telegrambot.service.ServiceConstants.*;
 
 @Service
 public class TelegramBotUpdatesListener implements UpdatesListener {
@@ -42,28 +42,27 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
     public int process(List<Update> updates) {
         updates.forEach(update -> {
             logger.info("Processing update: {}", update);
-            String welcomeMessage = "Welcome to the reminder bot! Enter a description of the task in the format \"01.01.2022 20:00 Some text\"";
             String messageText = update.message().text();
             Long chatId = update.message().chat().id();
 
-            if (messageText.startsWith("/start")) {
+            if (messageText.startsWith(START_MESSAGE)) {
                 logger.info("Message received: {}", messageText);
-                sendMessage(chatId, welcomeMessage);
-                logger.info("Message sent: {}", welcomeMessage);
+                sendMessage(chatId, WELCOME_MESSAGE);
+                logger.info("Message sent: {}", WELCOME_MESSAGE);
             } else {
-                Pattern pattern = Pattern.compile("([0-9\\.\\:\\s]{16})(\\s)([\\P{M}\\p{M}*+]+)");
-                Matcher matcher = pattern.matcher(messageText);
+                Matcher matcher = PATTERN.matcher(messageText);
                 if (matcher.matches()) {
                     String date = matcher.group(1);
                     messageText = messageText.replace(date, "").trim();
 
-                    LocalDateTime localDateTime = LocalDateTime.parse(date, DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+                    LocalDateTime localDateTime = LocalDateTime.parse(date, DATE_TIME_FORMATTER);
                     createTask(chatId, messageText, localDateTime);
+                    sendMessage(chatId, SUCCESSFULLY_SAVED_MESSAGE);
+                    logger.info("Message sent: {}", SUCCESSFULLY_SAVED_MESSAGE);
                     logger.info("Invoke method for creating task");
                 } else {
-                    messageText = "Wrong message format";
-                    sendMessage(chatId, messageText);
-                    logger.info("Message sent: {}", welcomeMessage);
+                    sendMessage(chatId, WRONG_MESSAGE_FORMAT);
+                    logger.info("Message sent: {}", WRONG_MESSAGE_FORMAT);
                 }
             }
         });
@@ -73,20 +72,16 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
     @Scheduled(cron = "0 0/1 * * * *")
     private void checkSchedule() {
         List<NotificationTask> scheduleTasks = notificationTaskRepository.getNotificationTaskByDateTime(LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES));
-        if (!scheduleTasks.isEmpty()) {
-            scheduleTasks.forEach(notificationTask -> {
-                sendMessage(notificationTask.getChatId(), notificationTask.getMessageText());
-                notificationTaskRepository.delete(notificationTask);
-                logger.info("Message sent: {} ", notificationTask);
-                logger.info("Invoke method for deleting task");
-            });
-        }
+        scheduleTasks.forEach(notificationTask -> {
+            sendMessage(notificationTask.getChatId(), notificationTask.getMessageText());
+            notificationTaskRepository.delete(notificationTask);
+            logger.info("Message sent: {} ", notificationTask);
+            logger.info("Invoke method for deleting task");
+        });
     }
 
     private void sendMessage(Long chatId, String message) {
-        SendMessage messageToSent = new SendMessage(chatId, message);
-        SendResponse response = telegramBot.execute(messageToSent);
-        response.isOk();
+        telegramBot.execute(new SendMessage(chatId, message));
     }
 
     private void createTask(Long chatId, String message, LocalDateTime dateTime) {
